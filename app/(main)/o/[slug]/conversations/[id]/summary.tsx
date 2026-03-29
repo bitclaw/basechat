@@ -55,8 +55,7 @@ export default function Summary({ className, source, slug, onCloseClick = () => 
   const effectiveStreamUrl = source.documentStreamUrl || source.streamUrl;
 
   const {
-    videoRef,
-    audioRef,
+    reactPlayerRef,
     state: mediaState,
     actions: mediaActions,
     handleCanPlay,
@@ -64,10 +63,8 @@ export default function Summary({ className, source, slug, onCloseClick = () => 
     handleTimeUpdate,
   } = useMediaPlayer({
     mediaType,
-    streamUrl: effectiveStreamUrl,
     startTime: source.startTime,
     mergedTimeRanges: source.mergedTimeRanges,
-    slug,
   });
 
   // Prepare media data
@@ -118,8 +115,7 @@ export default function Summary({ className, source, slug, onCloseClick = () => 
         mediaData={mediaData}
         state={mediaState}
         actions={mediaActions}
-        videoRef={videoRef}
-        audioRef={audioRef}
+        reactPlayerRef={reactPlayerRef}
         slug={slug}
         onCanPlay={handleCanPlay}
         onLoadedMetadata={handleLoadedMetadata}

@@ -3,19 +3,19 @@ import Image from "next/image";
 import { getRagieStreamPath } from "@/lib/paths";
 
 import PlayerControls from "../player-controls";
-import { MediaDisplayData, MediaPlayerState, MediaPlayerActions } from "../shared-types";
+import type { MediaDisplayData, MediaPlayerActions, MediaPlayerState } from "../shared-types";
+import ReactPlayerWrapper, { type ReactPlayerRef } from "./react-player-wrapper";
 
-interface MediaDisplayProps {
+type MediaDisplayProps = {
   mediaData: MediaDisplayData;
   state: MediaPlayerState;
   actions: MediaPlayerActions;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  audioRef: React.RefObject<HTMLAudioElement | null>;
+  reactPlayerRef: React.RefObject<ReactPlayerRef | null>;
   slug: string;
   onCanPlay: () => void;
   onLoadedMetadata: () => void;
   onTimeUpdate: () => void;
-}
+};
 
 function MediaSkeleton() {
   return (
@@ -31,8 +31,7 @@ export default function MediaDisplay({
   mediaData,
   state,
   actions,
-  videoRef,
-  audioRef,
+  reactPlayerRef,
   slug,
   onCanPlay,
   onLoadedMetadata,
@@ -48,14 +47,21 @@ export default function MediaDisplay({
     );
   }
 
-  if (mediaData.type === "audio" && mediaData.streamUrl) {
+  if ((mediaData.type === "audio" || mediaData.type === "video") && mediaData.streamUrl) {
+    const isVideo = mediaData.type === "video";
+    const showControls = state.isMediaLoaded && (isVideo ? state.duration > 0 : true);
+
     return (
       <div className="mb-6">
         <div className="flex flex-col">
-          <audio
-            ref={audioRef}
-            className="w-full"
+          <ReactPlayerWrapper
+            ref={reactPlayerRef}
             src={getRagieStreamPath(slug, mediaData.streamUrl)}
+            playing={state.isPlaying}
+            muted={state.isMuted}
+            width="100%"
+            height={isVideo ? undefined : 0}
+            style={isVideo ? { borderRadius: "0.5rem", overflow: "hidden" } : { display: "none" }}
             controls={false}
             preload="metadata"
             onCanPlay={onCanPlay}
@@ -64,7 +70,7 @@ export default function MediaDisplay({
             onDurationChange={onLoadedMetadata}
             onTimeUpdate={onTimeUpdate}
           />
-          {state.isMediaLoaded ? (
+          {showControls ? (
             <PlayerControls
               isPlaying={state.isPlaying}
               isMuted={state.isMuted}
@@ -77,42 +83,8 @@ export default function MediaDisplay({
               onReplay={actions.onReplay}
               onFullscreen={actions.onFullscreen}
               onDragStateChange={actions.onDragStateChange}
-            />
-          ) : (
-            <MediaSkeleton />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (mediaData.type === "video" && mediaData.streamUrl) {
-    return (
-      <div className="mb-6">
-        <div className="flex flex-col">
-          <video
-            ref={videoRef}
-            className="w-full rounded-lg"
-            src={getRagieStreamPath(slug, mediaData.streamUrl)}
-            controls={false}
-            onCanPlay={onCanPlay}
-            onLoadedMetadata={onLoadedMetadata}
-            onLoadedData={onLoadedMetadata}
-            onTimeUpdate={onTimeUpdate}
-          />
-          {state.isMediaLoaded && state.duration > 0 ? (
-            <PlayerControls
-              isPlaying={state.isPlaying}
-              isMuted={state.isMuted}
-              currentTime={state.currentTime}
-              duration={state.duration}
-              onProgressClick={actions.onProgressClick}
-              onPlayPause={actions.onPlayPause}
-              onMute={actions.onMute}
-              onForward={actions.onForward}
-              onReplay={actions.onReplay}
-              onFullscreen={actions.onFullscreen}
-              onDragStateChange={actions.onDragStateChange}
+              mergedTimeRanges={mediaData.mergedTimeRanges}
+              onSeekTo={actions.onSeekTo}
             />
           ) : (
             <MediaSkeleton />

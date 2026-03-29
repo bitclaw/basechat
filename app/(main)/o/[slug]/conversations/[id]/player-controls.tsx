@@ -9,6 +9,8 @@ import PlayIcon from "@/public/icons/play.svg";
 import Replay10Icon from "@/public/icons/replay_10.svg";
 import VolumeUpIcon from "@/public/icons/volume_up.svg";
 
+import ChapterTimeline, { ChapterPills } from "./components/chapter-timeline";
+
 interface PlayerControlsProps {
   isPlaying: boolean;
   isMuted: boolean;
@@ -21,6 +23,8 @@ interface PlayerControlsProps {
   onReplay: () => void;
   onFullscreen: () => void;
   onDragStateChange: (isDragging: boolean) => void;
+  mergedTimeRanges?: { startTime: number; endTime: number }[];
+  onSeekTo?: (seconds: number) => void;
 }
 
 type DragState = {
@@ -58,6 +62,8 @@ export default function PlayerControls({
   onReplay,
   onFullscreen,
   onDragStateChange,
+  mergedTimeRanges,
+  onSeekTo,
 }: PlayerControlsProps) {
   const [dragState, dispatch] = useReducer(dragReducer, { isDragging: false, previewTime: null });
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -208,6 +214,9 @@ export default function PlayerControls({
             )}
             style={{ width: `${progressPercent}%` }}
           />
+          {mergedTimeRanges && mergedTimeRanges.length > 0 && duration > 0 && onSeekTo && (
+            <ChapterTimeline mergedTimeRanges={mergedTimeRanges} duration={duration} onSeekTo={onSeekTo} />
+          )}
           <div
             className={cn(
               "absolute top-1/2 -translate-y-1/2 w-1 h-3 bg-black rounded-sm cursor-grab active:cursor-grabbing transition-all duration-200",
@@ -224,6 +233,9 @@ export default function PlayerControls({
           <span>{formatTime(currentProgress)}</span>
           <span>{formatTime(duration)}</span>
         </div>
+        {mergedTimeRanges && mergedTimeRanges.length > 0 && onSeekTo && (
+          <ChapterPills mergedTimeRanges={mergedTimeRanges} onSeekTo={onSeekTo} />
+        )}
       </div>
       <div className="flex items-center justify-between gap-4">
         <button onClick={onMute} className="p-2 hover:bg-gray-200 rounded-lg transition-colors duration-200">

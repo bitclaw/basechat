@@ -52,4 +52,5 @@ export interface MediaPlayerActions {
   onFullscreen: () => void;
   onProgressClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onDragStateChange: (isDragging: boolean) => void;
+  onSeekTo: (seconds: number) => void;
 }

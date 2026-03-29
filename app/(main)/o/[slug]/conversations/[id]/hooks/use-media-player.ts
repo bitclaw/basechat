@@ -1,59 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { MediaPlayerState, MediaPlayerActions } from "../shared-types";
+import type { MediaPlayerActions, MediaPlayerState } from "../shared-types";
 
-interface UseMediaPlayerProps {
+type UseMediaPlayerProps = {
   mediaType: "audio" | "video" | "image" | null;
-  streamUrl?: string;
   startTime?: number;
   mergedTimeRanges?: { startTime: number; endTime: number }[];
-  slug: string;
-}
+};
 
-export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRanges, slug }: UseMediaPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+export function useMediaPlayer({ mediaType, startTime, mergedTimeRanges }: UseMediaPlayerProps) {
+  // React Player v3 exposes HTMLVideoElement via ref (handles both audio and video)
+  const reactPlayerRef = useRef<HTMLVideoElement | null>(null);
 
   const [state, setState] = useState<MediaPlayerState>({
     isPlaying: false,
     isMuted: false,
     currentTime: 0,
     duration: 0,
-    isMediaLoaded: mediaType === "image" || !mediaType, // Images are immediately "loaded"
+    isMediaLoaded: mediaType === "image" || !mediaType,
     isDragging: false,
     didInitialSeek: false,
   });
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      // Only handle progress clicks for audio/video
       if (mediaType !== "audio" && mediaType !== "video") return;
-
-      const media = videoRef.current || audioRef.current;
+      const media = reactPlayerRef.current;
       if (media && state.duration > 0) {
         const rect = e.currentTarget.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
         const newTime = pos * state.duration;
-
-        // Pause the media before seeking to prevent race conditions
-        const wasPlaying = !media.paused;
-        if (wasPlaying) {
-          media.pause();
-        }
-
         media.currentTime = newTime;
         setState((prev) => ({ ...prev, currentTime: newTime }));
-
-        // Resume playback if it was playing before
-        if (wasPlaying) {
-          const playPromise = media.play();
-          if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              console.error("Error resuming playback:", error);
-            });
-          }
-        }
       }
     },
     [mediaType, state.duration],
@@ -61,30 +39,18 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
 
   const onPlayPause = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
-    if (media) {
-      if (media.paused) {
-        media.play();
-        setState((prev) => ({ ...prev, isPlaying: true }));
-      } else {
-        media.pause();
-        setState((prev) => ({ ...prev, isPlaying: false }));
-      }
-    }
+    // Controlled via `playing` prop — toggle state and React Player responds
+    setState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
   }, [mediaType]);
 
   const onMute = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
-    if (media) {
-      media.muted = !media.muted;
-      setState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
-    }
+    setState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
   }, [mediaType]);
 
   const onForward = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
+    const media = reactPlayerRef.current;
     if (media) {
       const newTime = Math.min(media.duration, media.currentTime + 10);
       media.currentTime = newTime;
@@ -94,7 +60,7 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
 
   const onReplay = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
+    const media = reactPlayerRef.current;
     if (media) {
       const newTime = Math.max(0, media.currentTime - 10);
       media.currentTime = newTime;
@@ -104,19 +70,30 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
 
   const onFullscreen = useCallback(() => {
     if (mediaType !== "video") return;
-    const video = videoRef.current;
-    if (video) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        video.requestFullscreen();
-      }
+    const media = reactPlayerRef.current;
+    if (!media) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      media.requestFullscreen();
     }
   }, [mediaType]);
 
   const onDragStateChange = useCallback((isDragging: boolean) => {
     setState((prev) => ({ ...prev, isDragging }));
   }, []);
+
+  const onSeekTo = useCallback(
+    (seconds: number) => {
+      if (mediaType !== "audio" && mediaType !== "video") return;
+      const media = reactPlayerRef.current;
+      if (media) {
+        media.currentTime = seconds;
+        setState((prev) => ({ ...prev, currentTime: seconds }));
+      }
+    },
+    [mediaType],
+  );
 
   const actions: MediaPlayerActions = {
     onPlayPause,
@@ -126,26 +103,24 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
     onFullscreen,
     onProgressClick: handleProgressClick,
     onDragStateChange,
+    onSeekTo,
   };
 
-  // Cleanup animation frame on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+      setState((prev) => ({ ...prev, isPlaying: false }));
     };
   }, []);
 
-  // Media event handlers
+  // Native HTML media event handlers
   const handleCanPlay = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
-    if (media) {
+    const media = reactPlayerRef.current;
+    if (media && !state.didInitialSeek) {
       const seekTime = mergedTimeRanges && mergedTimeRanges.length > 0 ? mergedTimeRanges[0].startTime : startTime;
-      const canSeek = media.seekable.end(0) >= (seekTime || 0);
-      if (canSeek && !state.didInitialSeek) {
+      const canSeek = media.seekable.length > 0 && media.seekable.end(0) >= (seekTime || 0);
+      if (canSeek) {
         media.currentTime = seekTime || 0;
         setState((prev) => ({
           ...prev,
@@ -158,7 +133,7 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
 
   const handleLoadedMetadata = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
+    const media = reactPlayerRef.current;
     if (media) {
       setState((prev) => ({
         ...prev,
@@ -170,15 +145,14 @@ export function useMediaPlayer({ mediaType, streamUrl, startTime, mergedTimeRang
 
   const handleTimeUpdate = useCallback(() => {
     if (mediaType !== "audio" && mediaType !== "video") return;
-    const media = videoRef.current || audioRef.current;
+    const media = reactPlayerRef.current;
     if (media && media.currentTime !== state.currentTime) {
       setState((prev) => ({ ...prev, currentTime: media.currentTime }));
     }
   }, [mediaType, state.currentTime]);
 
   return {
-    videoRef,
-    audioRef,
+    reactPlayerRef,
     state,
     actions,
     handleCanPlay,

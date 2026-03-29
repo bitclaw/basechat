@@ -16,8 +16,7 @@ export default function SourceDetails({ slug, sourceId, runId }: { slug: string;
 
   // Use media player hook for proper state management
   const {
-    videoRef,
-    audioRef,
+    reactPlayerRef,
     state: mediaState,
     actions: mediaActions,
     handleCanPlay,
@@ -25,10 +24,8 @@ export default function SourceDetails({ slug, sourceId, runId }: { slug: string;
     handleTimeUpdate,
   } = useMediaPlayer({
     mediaType: mediaData?.type || null,
-    streamUrl: mediaData?.streamUrl,
     startTime: mediaData?.startTime,
     mergedTimeRanges: mediaData?.mergedTimeRanges,
-    slug,
   });
 
   if (error) {
@@ -48,8 +45,7 @@ export default function SourceDetails({ slug, sourceId, runId }: { slug: string;
           mediaData={mediaData}
           state={mediaState}
           actions={mediaActions}
-          videoRef={videoRef}
-          audioRef={audioRef}
+          reactPlayerRef={reactPlayerRef}
           slug={slug}
           onCanPlay={handleCanPlay}
           onLoadedMetadata={handleLoadedMetadata}
