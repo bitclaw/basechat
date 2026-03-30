@@ -6,7 +6,7 @@
 # openssl rand -hex 32 # → BETTER_AUTH_SECRET
 # openssl rand -hex 32 # → ENCRYPTION_KEY
 #
-# # Fill those + your RAGIE_API_KEY + ANTHROPIC_API_KEY into .env.local
+# # Fill those + your RAGIE_API_KEY + ANTHROPIC_API_KEY into .env
 # # then:
 #
 # make start # postgres up
